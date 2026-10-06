@@ -72,9 +72,14 @@ def compute_metrics(commits: list[CommitRecord]) -> EngineResult:
     alias: dict[str, str] = {}
 
     def resolve(path: str) -> str:
-        """Follow rename aliases to the object's latest path."""
+        """Follow rename aliases to the object's latest path.
+        Breaks on cycles (files renamed back and forth)."""
         seen = path
+        visited: set[str] = set()
         while seen in alias:
+            if seen in visited:
+                break  # cycle — stop at last valid step
+            visited.add(seen)
             seen = alias[seen]
         return seen
 

@@ -4,180 +4,34 @@
 > broken down per **author**, per **file**, per **directory**, per **commit
 > set**, and for the **repository as a whole**.
 
-RAT (Repo Analysis Tool) ingests one or more git repositories, resolves author
-identities (via `.mailmap` or manual merging), computes a catalogue of metrics,
+RAT ingests one or more git repositories, resolves author identities (via
+`.mailmap` and manual merging), computes metrics from the full commit history,
 and presents the results in a filterable dashboard.
 
 ---
 
-## Table of Contents
-
-1. [Project Description](#project-description)
-2. [Features](#features)
-3. [Metric Categories](#metric-categories)
-4. [Dashboard Filtering](#dashboard-filtering)
-5. [Tech Stack](#tech-stack)
-6. [Project Structure](#project-structure)
-7. [Getting Started](#getting-started)
-8. [API Overview](#api-overview)
-9. [Extending RAT](#extending-rat)
-10. [Roadmap](#roadmap)
-
----
-
-## Project Description
-
-Development activity in a repository is not uniform: some files change
-constantly, some authors touch everything, some directories stagnate. RAT makes
-that visible. Given a repository, it walks the git history and computes metrics
-at four granularities:
-
-| Granularity   | Question it answers                                   |
-| ------------- | ----------------------------------------------------- |
-| **Author**    | How much has each developer contributed, and where?   |
-| **File**      | Which files are churning, growing, or risky?          |
-| **Directory** | Which areas of the codebase are most active?          |
-| **Repository**| How healthy/active is the project overall?            |
-
-Results are exposed through a REST API and rendered on a dashboard that can be
-filtered by repository, author, file/directory, and by commits — either a time
-period or a manually selected list of commits.
-
-### Repository input
-
-A repository can be provided in two forms:
-
-1. **Zip upload** — a `.zip` of the working tree that **includes the `.git`
-   directory**, so full history is available.
-2. **Remote URL** — the repository is **deeply cloned** (full history, not a
-   shallow clone) from the given URL.
-
-### Author merging
-
-Not every commit by the same person shares one author identity (different
-emails, spellings, machines). RAT resolves identities in two stages:
-
-1. **`.mailmap`** — if the repository ships a
-   [`.mailmap`](https://git-scm.com/docs/gitmailmap) file, its mappings are
-   applied automatically.
-2. **Manual merging** — regardless of whether a mailmap exists, the user can
-   merge arbitrary authors together in the dashboard.
-
-## Features
-
-- **Repository Upload** — ingest via zip file (with `.git`) or clone URL.
-- **Multiple Repository Support** — several repositories registered side by
-  side; the dashboard switches between them.
-- **Author Merging** — automatic via `.mailmap`, manual via the UI.
-- **Metric Categories** — File, Directory, Repository, and Commit Set metrics
-  (see below).
-- **Filtering** — every metric query accepts the common filter set
-  (repository, author, path, time range, explicit commit list).
-
-> Note: the metric modules and ingestion services are currently **stubs** —
-> this repository is the initialized skeleton. See [Roadmap](#roadmap).
-
-## Metric Categories
-
-The exact metric definitions are specified in the course brief; each one is
-implemented as a small, pluggable *calculator* so the catalogue is easy to
-extend. The four categories:
-
-- **File Metrics** — computed for every file in scope
-  (e.g. churn, size, authorship for that file).
-- **Directory Metrics** — aggregated per directory over the files it contains.
-- **Repository Metrics** — single values describing the whole repository.
-- **Commit Set Metrics** — computed over an arbitrary set of commits (a time
-  period or a hand-picked list).
-
-Concrete definitions live in [`docs/metrics.md`](docs/metrics.md) and are
-implemented under `backend/app/core/metrics/`.
-
-## Dashboard Filtering
-
-Every view/query can be filtered by:
-
-- **Repository** — any ingested repository.
-- **Author** — canonical (merged) author.
-- **File or directory** — a path prefix within the repository.
-- **Commits** —
-  - a **time period** (`since` / `until`), or
-  - a **manually selected list of commits**.
-
-## Tech Stack
-
-| Layer     | Choice                                        | Why                                             |
-| --------- | --------------------------------------------- | ----------------------------------------------- |
-| Backend   | Python 3.11+, FastAPI, GitPython, Pydantic v2 | Mature git analysis + typed async API + OpenAPI |
-| Frontend  | React 18, TypeScript, Vite, Axios             | Fast dashboard DX, typed API client             |
-| Testing   | pytest (backend)                              | Standard, integrates with FastAPI TestClient    |
-| Monorepo  | `backend/` + `frontend/` + `docs/`            | Clear separation, independent tooling           |
-
-## Project Structure
-
-```
-.
-├── README.md                     ← you are here
-├── docs/
-│   ├── architecture.md           ← layers, data flow, extension points
-│   └── metrics.md                ← metric catalogue per category
-├── backend/
-│   ├── requirements.txt
-│   ├── app/
-│   │   ├── main.py               ← FastAPI entry point (health check live)
-│   │   ├── config.py             ← settings (storage dir, CORS, env: RAT_*)
-│   │   ├── api/routes/           ← REST surface (stubs)
-│   │   │   ├── repositories.py   ←   list / upload zip / clone URL
-│   │   │   ├── authors.py        ←   list / manual merge
-│   │   │   └── metrics.py        ←   file / directory / repo / commit-set
-│   │   ├── core/
-│   │   │   ├── git_service.py    ← clone & zip extraction (stub)
-│   │   │   ├── mailmap.py        ← identity resolution (stub)
-│   │   │   └── metrics/
-│   │   │       ├── base.py       ← MetricCalculator ABC + registry ★
-│   │   │       ├── file_metrics.py
-│   │   │       ├── directory_metrics.py
-│   │   │       ├── repository_metrics.py
-│   │   │       └── commit_set_metrics.py
-│   │   ├── models/schemas.py     ← Pydantic domain models
-│   │   └── services/
-│   │       ├── repository_store.py ← multi-repo registry (stub)
-│   │       └── filters.py        ← shared commit filtering (stub)
-│   └── tests/                    ← pytest
-└── frontend/
-    ├── package.json  vite.config.ts  tsconfig.json  index.html
-    └── src/
-        ├── App.tsx               ← dashboard shell (placeholder panels)
-        ├── api/client.ts         ← typed backend client (stub)
-        ├── types/index.ts        ← TS mirrors of the API models
-        ├── components/           ← filter bar, metric cards, tables…
-        └── pages/                ← dashboard, authors, files views…
-```
-
-★ `core/metrics/base.py` is the main extension point — see
-[Extending RAT](#extending-rat).
-
-## Getting Started
+## Quick Start
 
 ### Prerequisites
 
-- Python ≥ 3.11 (with `venv`)
-- Node.js ≥ 18 (with npm)
-- `git` available on the system PATH
+- **Python >= 3.11** (with `venv`)
+- **Node.js >= 18** (with npm)
+- **git** on the system PATH
 
-### Backend
+### 1. Backend
 
 ```bash
 cd backend
-python -m venv .venv && source .venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
 - Health check: <http://localhost:8000/api/health>
-- Interactive API docs: <http://localhost:8000/docs>
+- Interactive API docs (Swagger): <http://localhost:8000/docs>
 
-### Frontend
+### 2. Frontend
 
 ```bash
 cd frontend
@@ -185,73 +39,168 @@ npm install
 npm run dev
 ```
 
-Dashboard runs at <http://localhost:5173> and proxies `/api/*` to the backend
-on port 8000 (see `frontend/vite.config.ts`).
+Dashboard runs at <http://localhost:5173> and proxies `/api/*` to the backend.
 
-### Tests
+### 3. Tests
 
 ```bash
-cd backend && pytest
+cd backend
+source .venv/bin/activate
+python -m pytest -q           # 45 tests, <2s
 ```
 
-## API Overview
+---
 
-Planned REST surface (stubs exist at these routes):
+## Features
 
-| Method | Route                       | Purpose                                  |
-| ------ | --------------------------- | ---------------------------------------- |
-| GET    | `/api/health`               | Liveness probe ✅ implemented            |
-| GET    | `/api/repositories`         | List ingested repositories               |
-| POST   | `/api/repositories/upload`  | Ingest a repo zip (must contain `.git`)  |
-| POST   | `/api/repositories/clone`   | Deep-clone a repo from a remote URL      |
-| GET    | `/api/authors`              | List canonical authors of a repository   |
-| POST   | `/api/authors/merge`        | Manually merge author identities         |
-| GET    | `/api/metrics/files`        | Per-file metrics (filtered)              |
-| GET    | `/api/metrics/directories`  | Per-directory metrics (filtered)         |
-| GET    | `/api/metrics/repository`   | Whole-repository metrics (filtered)      |
-| GET    | `/api/metrics/commit-set`   | Metrics over a selected set of commits   |
+| Feature | Status |
+|---------|--------|
+| Clone from URL (deep, full history) | Done |
+| Upload ZIP (with `.git` directory) | Done |
+| Multiple repositories side by side | Done |
+| `.mailmap` author resolution (automatic) | Done |
+| Manual author merging via UI | Done |
+| File metrics (added, removed, growth, churn, modifications, mod frequency, churn rate) | Done |
+| Directory metrics (recursive aggregation) | Done |
+| Repository metrics (root-level summary) | Done |
+| Commit-set metrics (time range or manual SHA list) | Done |
+| Author metrics (per-author churn, modifications, ownership) | Done |
+| Filtering: author, path prefix, since/until, manual commits | Done |
+| Dashboard: repo selector, filter bar, sortable tables, summary cards, churn chart, author ownership | Done |
+| Disk caching of parsed git log (JSON, instant reload) | Done |
+| Rename continuity (-M50, history follows renames) | Done |
 
-All metric endpoints accept the shared filter: `repository_id`, `author_id`,
+## Metric Definitions
+
+All metrics derive from per-commit per-file primitives:
+
+| Metric | Formula | Unit |
+|--------|---------|------|
+| Added lines | `l+` | lines |
+| Removed lines | `l-` | lines |
+| Growth | `δ = l+ - l-` | lines |
+| Churn | `λ = l+ + l-` | lines |
+| Modifications | `n` (commits where churn > 0) | commits |
+| Modification frequency | `η = n / \|H\|` | ratio |
+| Churn rate | `ρ = λ / \|H\|` | lines/commit |
+| Author ownership | `ω = λ_a / λ` | ratio (0..1) |
+
+- **Directory metrics** = recursive sum over all descendant files.
+- **Repository metrics** = root directory row.
+- **H̄** = non-merge commits reachable from a ref (default HEAD).
+- Rename detection at 50% similarity (`-M50`); binary files excluded.
+- Time filtering: `since` inclusive, `until` exclusive.
+- Manual commit selection (list of SHAs) takes precedence over time range.
+
+Full catalogue: [`docs/metrics.md`](docs/metrics.md)
+
+## Architecture
+
+```
+Frontend (React 18 + TS + Vite)  ─── /api proxy ───►  Backend (FastAPI + Python 3.11+)
+                                                        │
+        RepoSelector ◄──────────── GET /repositories    │  git_service.py
+        FilterBar    ◄──────────── GET /authors          │    ├─ clone / zip extract
+        MetricTable  ◄──────────── GET /metrics/*        │    ├─ git log --numstat parse
+        RepoSummary  ◄──────────── GET /metrics/repo     │    └─ disk + memory cache
+        AuthorTable  ◄──────────── by_author in reports  │
+        ChurnChart   ◄──────────── GET /metrics/files    │  engine.py (one-pass aggregation)
+        AuthorManager ──────────► POST /authors/merge    │  mailmap.py (manual merge rules)
+```
+
+### Key design decisions
+
+1. **Single subprocess parse** — `git log --numstat -M50 --no-merges -z` is
+   parsed once per (repo, ref). Git's own C implementation handles diffs,
+   renames, binary detection, mailmap, and merge exclusion.
+2. **One-pass engine** — all five metric categories computed in a single
+   traversal of the parsed commits. Directory metrics are telescoped (each
+   file's primitives propagated to all ancestor directories).
+3. **Disk caching** — parsed commit records are serialized to JSON in
+   `backend/data/.log_cache/`. First parse of Redis (~12k commits) takes
+   ~14s; subsequent loads take ~0.1s.
+4. **Rename cycle safety** — alias resolution detects cycles (files renamed
+   back and forth) to prevent infinite loops.
+
+## Project Structure
+
+```
+.
+├── README.md
+├── docs/
+│   ├── architecture.md
+│   └── metrics.md
+├── backend/
+│   ├── requirements.txt
+│   ├── app/
+│   │   ├── main.py                  ← FastAPI entry point
+│   │   ├── config.py                ← settings (RAT_STORAGE_DIR, CORS)
+│   │   ├── api/routes/
+│   │   │   ├── repositories.py      ← list / upload / clone / commits
+│   │   │   ├── authors.py           ← list / merge / unmerge
+│   │   │   └── metrics.py           ← files / directories / repository / commit-set
+│   │   ├── core/
+│   │   │   ├── git_service.py       ← ingestion + git log parse + disk cache
+│   │   │   ├── mailmap.py           ← manual author merge rules
+│   │   │   └── metrics/
+│   │   │       └── engine.py        ← one-pass metric aggregation
+│   │   ├── models/schemas.py        ← Pydantic domain models
+│   │   └── services/
+│   │       ├── repository_store.py  ← multi-repo in-memory registry
+│   │       └── filters.py           ← commit set selection (since/until/SHAs)
+│   └── tests/
+│       ├── conftest.py              ← synthetic repo fixture
+│       ├── test_engine.py           ← 16 metric arithmetic tests
+│       ├── test_ingestion.py        ← 13 end-to-end API tests
+│       ├── test_author_merge.py     ← 16 merge/multi-repo/filter tests
+│       └── test_health.py           ← smoke test
+└── frontend/
+    ├── package.json  vite.config.ts  tsconfig.json  index.html
+    └── src/
+        ├── App.tsx                  ← main dashboard (state + effects)
+        ├── api/client.ts            ← typed API wrappers
+        ├── types/index.ts           ← TS mirrors of backend models
+        ├── index.css                ← dark theme styles
+        └── components/
+            ├── RepoSelector.tsx     ← repo dropdown + add forms
+            ├── FilterBar.tsx        ← author/path/date/commits
+            ├── MetricTable.tsx      ← sortable file/directory tables
+            ├── RepoSummary.tsx      ← summary cards
+            ├── AuthorTable.tsx      ← author ownership table
+            ├── ChurnChart.tsx       ← CSS-only bar chart
+            └── AuthorManager.tsx    ← author merge UI
+```
+
+## API Reference
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| GET | `/api/health` | Liveness probe |
+| GET | `/api/repositories` | List ingested repositories |
+| POST | `/api/repositories/clone` | Deep-clone from URL |
+| POST | `/api/repositories/upload` | Upload repo ZIP |
+| GET | `/api/repositories/commits` | List commits (SHA, author, date, message) |
+| GET | `/api/authors?repository_id=` | List canonical authors |
+| POST | `/api/authors/merge` | Merge author identities |
+| POST | `/api/authors/unmerge` | Revert a merge |
+| GET | `/api/metrics/files` | Per-file metrics |
+| GET | `/api/metrics/directories` | Per-directory metrics |
+| GET | `/api/metrics/repository` | Whole-repository metrics |
+| GET | `/api/metrics/commit-set` | Metrics over selected commits |
+
+All metric endpoints accept: `repository_id` (required), `ref`, `author_id`,
 `path`, `since`, `until`, `commits[]`.
 
-## Extending RAT
+## Performance
 
-**Adding a new metric** — subclass `MetricCalculator` in the matching category
-module and register it:
+| Repository | Commits | First parse | Cached load | Aggregate |
+|-----------|---------|-------------|-------------|-----------|
+| cJSON | ~955 | 0.2s | <0.01s | <0.01s |
+| Redis | ~12k | ~14s | 0.1s | 0.19s |
 
-```python
-# backend/app/core/metrics/file_metrics.py
-from app.core.metrics.base import MetricCalculator, register_metric
-from app.models.schemas import MetricCategory, MetricFilter, MetricReport
+Parsed git log output is cached to disk as JSON. Subsequent page loads and
+filter changes hit the cache and return in <1s.
 
-class LinesOfCode(MetricCalculator):
-    key = "loc"
-    category = MetricCategory.FILE
-    description = "Lines of code per file"
+## License
 
-    def calculate(self, repo_path, filters: MetricFilter) -> MetricReport:
-        ...  # walk repo_path constrained by filters
-
-register_metric(LinesOfCode())
-```
-
-The API layer discovers registered calculators automatically — no route
-changes needed.
-
-**Adding an endpoint** — create a router in `backend/app/api/routes/` and
-include it in `backend/app/main.py`.
-
-**Adding a dashboard view** — add a page under `frontend/src/pages/`, compose
-components from `frontend/src/components/`, call the backend through
-`frontend/src/api/client.ts`.
-
-## Roadmap
-
-- [ ] Repository ingestion: zip extraction + deep clone (`core/git_service.py`)
-- [ ] Multi-repository registry (`services/repository_store.py`)
-- [ ] `.mailmap` parsing + manual author merging (`core/mailmap.py`)
-- [ ] Commit filtering: author / path / time range / explicit list
-      (`services/filters.py`)
-- [ ] File / Directory / Repository / Commit Set metric calculators
-- [ ] Dashboard: repository selector, filter bar, metric panels
-- [ ] Manual commit selection UI
+Academic project — COMS3011A, University of the Witwatersrand.

@@ -20,10 +20,12 @@ deleted path. Merge commits are excluded (H̄ is non-merge commits only).
 
 from __future__ import annotations
 
+import hashlib
+import json
 import shutil
 import subprocess
 import zipfile
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 _COMMIT_SEP = b"\x1e"
@@ -106,11 +108,15 @@ def parse_log(output: bytes) -> list[CommitRecord]:
 
 
 class GitService:
-    """Ingestion and history access. Parsed logs are cached in memory per
-    (repo, ref); disk caching is a later performance pass."""
+    """Ingestion and history access. Parsed logs are cached in memory AND
+    on disk (JSON) per (repo, ref). First hit pays the git-log cost;
+    subsequent loads are instant."""
+
+    CACHE_DIR = Path("data/.log_cache")
 
     def __init__(self) -> None:
         self._log_cache: dict[tuple[str, str], list[CommitRecord]] = {}
+        self.CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
     # ------------------------------------------------------------------
     # Ingestion
@@ -156,16 +162,31 @@ class GitService:
 
     def iter_commits(self, repo_path: Path, ref: str = "HEAD") -> list[CommitRecord]:
         """Non-merge commits reachable from `ref`, newest first, with per-file
-        added/removed lines (cached per repo+ref)."""
+        added/removed lines. Cached in memory + on disk (JSON)."""
         key = (str(repo_path), ref)
-        if key not in self._log_cache:
-            out = self._run_git(
-                repo_path,
-                ["log", "--no-merges", "-M50", "--numstat", "-z",
-                 f"--format={_LOG_FORMAT}", ref],
-            )
-            self._log_cache[key] = parse_log(out)
-        return self._log_cache[key]
+        if key in self._log_cache:
+            return self._log_cache[key]
+
+        # Try disk cache
+        disk_path = self._cache_path(repo_path, ref)
+        if disk_path.exists():
+            commits = self._load_disk_cache(disk_path)
+            if commits is not None:
+                self._log_cache[key] = commits
+                return commits
+
+        # Parse from git
+        out = self._run_git(
+            repo_path,
+            ["log", "--no-merges", "-M50", "--numstat", "-z",
+             f"--format={_LOG_FORMAT}", ref],
+        )
+        commits = parse_log(out)
+        self._log_cache[key] = commits
+
+        # Persist to disk
+        self._save_disk_cache(disk_path, commits)
+        return commits
 
     def default_branch(self, repo_path: Path) -> str:
         out = self._run_git(repo_path, ["rev-parse", "--abbrev-ref", "HEAD"])
@@ -176,6 +197,47 @@ class GitService:
         keys_to_drop = [k for k in self._log_cache if k[0] == repo_path_str]
         for k in keys_to_drop:
             del self._log_cache[k]
+
+    # ------------------------------------------------------------------
+    # Disk cache helpers
+    # ------------------------------------------------------------------
+
+    def _cache_path(self, repo_path: Path, ref: str) -> Path:
+        h = hashlib.sha256(f"{repo_path}:{ref}".encode()).hexdigest()[:16]
+        return self.CACHE_DIR / f"{h}.json"
+
+    @staticmethod
+    def _save_disk_cache(path: Path, commits: list[CommitRecord]) -> None:
+        try:
+            data = [asdict(c) for c in commits]
+            path.write_text(json.dumps(data), encoding="utf-8")
+        except OSError:
+            pass  # non-fatal
+
+    @staticmethod
+    def _load_disk_cache(path: Path) -> list[CommitRecord] | None:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return [
+                CommitRecord(
+                    sha=d["sha"],
+                    timestamp=d["timestamp"],
+                    author_name=d["author_name"],
+                    author_email=d["author_email"],
+                    files=[
+                        FileChange(
+                            path=f["path"],
+                            added=f["added"],
+                            removed=f["removed"],
+                            old_path=f.get("old_path"),
+                        )
+                        for f in d["files"]
+                    ],
+                )
+                for d in data
+            ]
+        except (OSError, json.JSONDecodeError, KeyError):
+            return None
 
     # ------------------------------------------------------------------
 
