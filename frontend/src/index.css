@@ -1,49 +1,312 @@
+/* ================================================================== */
+/* Theme & Reset                                                       */
+/* ================================================================== */
 :root {
   color-scheme: dark;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --bg: #0f1420;
+  --surface: #171e2e;
+  --border: #263048;
+  --text: #e6e9f0;
+  --muted: #9aa4b8;
+  --dim: #7d879c;
+  --accent: #5b8af5;
+  --accent-hover: #7ba2ff;
+  --danger: #e74c3c;
+  --green: #2ecc71;
+  --radius: 10px;
 }
+
+*, *::before, *::after { box-sizing: border-box; }
 
 body {
   margin: 0;
-  background: #0f1420;
-  color: #e6e9f0;
+  background: var(--bg);
+  color: var(--text);
 }
 
+/* ================================================================== */
+/* App layout                                                          */
+/* ================================================================== */
 .app {
-  max-width: 1100px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 2rem 1.5rem;
+  padding: 1.5rem 1.5rem 3rem;
 }
 
-.app-header h1 {
-  margin: 0 0 0.25rem;
-  font-size: 1.6rem;
-}
+.app-header h1 { margin: 0 0 0.25rem; font-size: 1.6rem; }
+.app-header p  { margin: 0 0 1.5rem; color: var(--muted); }
 
-.app-header p {
-  margin: 0 0 2rem;
-  color: #9aa4b8;
-}
+.app-main { display: grid; gap: 1rem; }
 
-.app-main {
-  display: grid;
-  gap: 1rem;
-}
-
+/* ================================================================== */
+/* Panels                                                              */
+/* ================================================================== */
 .panel {
-  background: #171e2e;
-  border: 1px solid #263048;
-  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   padding: 1.25rem 1.5rem;
 }
-
 .panel h2 {
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.75rem;
   font-size: 1.05rem;
 }
 
-.placeholder {
-  margin: 0;
-  color: #7d879c;
-  font-style: italic;
+/* ================================================================== */
+/* Inputs & Buttons                                                    */
+/* ================================================================== */
+.input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  font-size: 0.9rem;
+  width: 100%;
 }
+.input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+select.input { cursor: pointer; }
+
+textarea.input { resize: vertical; font-family: monospace; font-size: 0.82rem; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.btn:hover:not(:disabled) { background: var(--accent-hover); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+
+.btn-secondary {
+  background: var(--border);
+  color: var(--text);
+}
+.btn-secondary:hover:not(:disabled) { background: #334060; }
+
+/* ================================================================== */
+/* Repo Selector                                                       */
+/* ================================================================== */
+.repo-selector select.input { margin-bottom: 0.75rem; }
+
+.add-repo-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.add-repo-row .input { flex: 1; }
+
+.file-label { cursor: pointer; }
+
+/* ================================================================== */
+/* Filter Bar                                                          */
+/* ================================================================== */
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+.filter-field { display: flex; flex-direction: column; gap: 0.3rem; }
+.filter-field-wide { grid-column: 1 / -1; }
+.filter-label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* ================================================================== */
+/* Tab bar                                                             */
+/* ================================================================== */
+.tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+}
+.tab {
+  padding: 0.5rem 1.25rem;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ================================================================== */
+/* Metric Tables                                                       */
+/* ================================================================== */
+.table-wrap { overflow-x: auto; }
+
+.metric-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+.metric-table th,
+.metric-table td {
+  padding: 0.45rem 0.6rem;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.metric-table th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.sortable { cursor: pointer; user-select: none; }
+.sortable:hover { color: var(--accent); }
+
+.cell-path { text-align: left; font-family: monospace; font-size: 0.84rem; max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
+.cell-num  { font-variant-numeric: tabular-nums; }
+.cell-churn { color: var(--danger); font-weight: 600; }
+
+/* ================================================================== */
+/* Summary Cards                                                       */
+/* ================================================================== */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+.summary-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.summary-value { font-size: 1.4rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.summary-label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* ================================================================== */
+/* Author Ownership bar                                                */
+/* ================================================================== */
+.cell-bar { width: 120px; }
+.ownership-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--accent);
+  transition: width 0.3s;
+}
+
+/* ================================================================== */
+/* Churn Chart (CSS-only bar chart)                                    */
+/* ================================================================== */
+.churn-chart { display: flex; flex-direction: column; gap: 0.35rem; }
+.churn-row {
+  display: grid;
+  grid-template-columns: 140px 1fr 60px;
+  align-items: center;
+  gap: 0.5rem;
+}
+.churn-label {
+  font-family: monospace;
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.churn-track {
+  height: 12px;
+  background: var(--bg);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.churn-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--danger), #ff7675);
+  border-radius: 6px;
+  transition: width 0.3s;
+}
+.churn-value {
+  text-align: right;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+/* ================================================================== */
+/* Author Manager                                                      */
+/* ================================================================== */
+.hint { margin: 0 0 0.75rem; font-size: 0.85rem; color: var(--dim); }
+.author-list { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.75rem; }
+.author-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.author-item:hover { background: var(--bg); }
+.author-email { color: var(--dim); font-size: 0.85rem; }
+.author-badge {
+  font-size: 0.72rem;
+  background: var(--accent);
+  color: #fff;
+  padding: 0.1rem 0.4rem;
+  border-radius: 8px;
+  margin-left: auto;
+}
+
+/* ================================================================== */
+/* Loading & Error                                                     */
+/* ================================================================== */
+.loading-banner {
+  text-align: center;
+  padding: 0.6rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--accent);
+  font-size: 0.9rem;
+  animation: pulse 1.2s infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+.error-msg {
+  color: var(--danger);
+  font-size: 0.88rem;
+  margin: 0.5rem 0 0;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  margin: 0.5rem auto 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.empty-state { text-align: center; padding: 3rem 1.5rem; }
+.empty-state h2 { color: var(--muted); }
+.empty-state p { color: var(--dim); }
+
+.placeholder { margin: 0; color: var(--dim); font-style: italic; }
