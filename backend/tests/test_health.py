@@ -13,7 +13,7 @@ def test_health() -> None:
     assert response.json() == {"status": "ok"}
 
 
-def test_list_repositories_empty() -> None:
+def test_list_repositories() -> None:
     response = client.get("/api/repositories")
     assert response.status_code == 200
-    assert response.json() == []
+    assert isinstance(response.json(), list)

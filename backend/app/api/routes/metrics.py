@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.api.routes.repositories import _get_repo
 from app.core.git_service import GitError, git_service
+from app.core.mailmap import author_merger
 from app.core.metrics.engine import EngineResult, compute_metrics, to_reports
 from app.models.schemas import MetricCategory, MetricReport
 from app.services.filters import select_commits
@@ -27,13 +28,14 @@ def _run(
     until: datetime | None,
     commits: list[str] | None,
 ) -> EngineResult:
-    """Parse (cached) -> select H -> aggregate, for one repository."""
+    """Parse (cached) -> apply manual author merges -> select H -> aggregate."""
     repo = _get_repo(repository_id)
     try:
         history = git_service.iter_commits(Path(repo.path), ref)
     except GitError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    selected = select_commits(history, since=since, until=until, shas=commits)
+    merged = author_merger.apply(repository_id, history)
+    selected = select_commits(merged, since=since, until=until, shas=commits)
     return compute_metrics(selected)
 
 

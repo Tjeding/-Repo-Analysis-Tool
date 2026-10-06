@@ -59,8 +59,9 @@ class Author(BaseModel):
 class MergeAuthorsRequest(BaseModel):
     """Body for POST /api/authors/merge.
 
-    `canonical` optionally overrides the display name/email of the merged
-    author; otherwise the mailmap (or most frequent identity) wins.
+    `author_ids` are author_key strings, e.g. ["Alice <alice@a.com>",
+    "Alice <alice@work.com>"]. `canonical` optionally overrides the display
+    name/email of the merged author; otherwise the first identity wins.
     """
 
     repository_id: str

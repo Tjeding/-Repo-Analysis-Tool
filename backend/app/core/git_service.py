@@ -171,6 +171,12 @@ class GitService:
         out = self._run_git(repo_path, ["rev-parse", "--abbrev-ref", "HEAD"])
         return out.decode().strip()
 
+    def invalidate_cache_for_repo(self, repo_path_str: str) -> None:
+        """Drop cached log entries for a repo (e.g. after author merge changes)."""
+        keys_to_drop = [k for k in self._log_cache if k[0] == repo_path_str]
+        for k in keys_to_drop:
+            del self._log_cache[k]
+
     # ------------------------------------------------------------------
 
     @staticmethod
