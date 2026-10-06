@@ -82,11 +82,14 @@ class CommitInfo(BaseModel):
 class MetricFilter(BaseModel):
     """Shared filter applied to every metric query.
 
-    Commit selection is either a time period (`since`/`until`) or a manually
-    selected list of commit SHAs (`commits`).
+    Commit selection is either a time period (`since` inclusive / `until`
+    exclusive) or a manually selected list of commit SHAs (`commits`, which
+    takes precedence). `ref` defines H̄: the non-merge commits reachable
+    from it (the graders' "specific commit hash").
     """
 
     repository_id: str
+    ref: str = "HEAD"
     author_id: str | None = None
     path: str | None = None  # file or directory prefix
     since: datetime | None = None
@@ -113,8 +116,14 @@ class MetricValue(BaseModel):
 
 class MetricReport(BaseModel):
     """One row in a metrics response: a scope (a file path, a directory path,
-    the repository itself, or a commit set) plus its computed metrics."""
+    the repository itself, or a commit set) plus its computed metrics.
+
+    `by_author` maps each canonical author ("Name <email>") to their
+    author-level metrics on this scope: author_modifications, author_churn,
+    author_ownership.
+    """
 
     category: MetricCategory
     scope: str
     metrics: dict[str, MetricValue] = Field(default_factory=dict)
+    by_author: dict[str, dict[str, float | int]] = Field(default_factory=dict)

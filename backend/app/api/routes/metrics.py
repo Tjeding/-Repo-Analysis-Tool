@@ -1,95 +1,109 @@
 """Metric query endpoints — one per metric category.
 
-All endpoints share the same filter surface (repository, author, path, time
-range, explicit commit list) and discover their calculators from the metric
-registry in app.core.metrics.base, so new metrics appear here automatically.
+All endpoints share the same filter surface (ref, author, path, time range,
+explicit commit list). Every category is served from ONE cached git-log
+parse and ONE aggregation pass (app.core.metrics.engine), so filtering is
+cheap and never re-walks the repository.
 """
 
 from datetime import datetime
+from pathlib import Path
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
-from app.models.schemas import MetricReport
+from app.api.routes.repositories import _get_repo
+from app.core.git_service import GitError, git_service
+from app.core.metrics.engine import EngineResult, compute_metrics, to_reports
+from app.models.schemas import MetricCategory, MetricReport
+from app.services.filters import select_commits
 
 router = APIRouter()
 
 
-def _build_filter(
+def _run(
     repository_id: str,
-    author_id: str | None,
-    path: str | None,
+    ref: str,
     since: datetime | None,
     until: datetime | None,
     commits: list[str] | None,
-):
-    """Assemble the shared MetricFilter from query parameters."""
-    from app.models.schemas import MetricFilter
-
-    return MetricFilter(
-        repository_id=repository_id,
-        author_id=author_id,
-        path=path,
-        since=since,
-        until=until,
-        commits=commits,
-    )
+) -> EngineResult:
+    """Parse (cached) -> select H -> aggregate, for one repository."""
+    repo = _get_repo(repository_id)
+    try:
+        history = git_service.iter_commits(Path(repo.path), ref)
+    except GitError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    selected = select_commits(history, since=since, until=until, shas=commits)
+    return compute_metrics(selected)
 
 
 @router.get("/files", response_model=list[MetricReport])
 def file_metrics(
     repository_id: str = Query(...),
+    ref: str = "HEAD",
     author_id: str | None = None,
     path: str | None = None,
     since: datetime | None = None,
     until: datetime | None = None,
     commits: list[str] | None = Query(None),
 ) -> list[MetricReport]:
-    """Per-file metrics for the filtered scope."""
-    # TODO: run registered FILE calculators via core.metrics.base.list_metrics
-    _build_filter(repository_id, author_id, path, since, until, commits)
-    return []
+    """Per-file metrics over the selected commit set. Only files with
+    activity in the set appear (untouched files are all-zero by definition)."""
+    result = _run(repository_id, ref, since, until, commits)
+    return to_reports(result, MetricCategory.FILE, path_prefix=path, author=author_id)
 
 
 @router.get("/directories", response_model=list[MetricReport])
 def directory_metrics(
     repository_id: str = Query(...),
+    ref: str = "HEAD",
     author_id: str | None = None,
     path: str | None = None,
     since: datetime | None = None,
     until: datetime | None = None,
     commits: list[str] | None = Query(None),
 ) -> list[MetricReport]:
-    """Per-directory metrics for the filtered scope."""
-    # TODO: run registered DIRECTORY calculators
-    _build_filter(repository_id, author_id, path, since, until, commits)
-    return []
+    """Per-directory metrics over the selected commit set (root is "/")."""
+    result = _run(repository_id, ref, since, until, commits)
+    return to_reports(
+        result, MetricCategory.DIRECTORY, path_prefix=path, author=author_id
+    )
 
 
 @router.get("/repository", response_model=list[MetricReport])
 def repository_metrics(
     repository_id: str = Query(...),
+    ref: str = "HEAD",
     author_id: str | None = None,
-    path: str | None = None,
     since: datetime | None = None,
     until: datetime | None = None,
     commits: list[str] | None = Query(None),
 ) -> list[MetricReport]:
-    """Whole-repository metrics for the filtered scope."""
-    # TODO: run registered REPOSITORY calculators
-    _build_filter(repository_id, author_id, path, since, until, commits)
-    return []
+    """Whole-repository metrics: directory metrics on the tree root."""
+    result = _run(repository_id, ref, since, until, commits)
+    report = to_reports(result, MetricCategory.REPOSITORY, author=author_id)
+    return [r for r in report if r.scope == "/"]
 
 
 @router.get("/commit-set", response_model=list[MetricReport])
 def commit_set_metrics(
     repository_id: str = Query(...),
+    ref: str = "HEAD",
     author_id: str | None = None,
     path: str | None = None,
     since: datetime | None = None,
     until: datetime | None = None,
     commits: list[str] | None = Query(None),
 ) -> list[MetricReport]:
-    """Metrics over a set of commits — a time period or a manual selection."""
-    # TODO: run registered COMMIT_SET calculators
-    _build_filter(repository_id, author_id, path, since, until, commits)
-    return []
+    """Metrics over a set of commits — a time period or a manual selection —
+    for every object (files + directories incl. root) in that set."""
+    result = _run(repository_id, ref, since, until, commits)
+    dir_reports = to_reports(
+        result, MetricCategory.COMMIT_SET, path_prefix=path, author=author_id
+    )
+    file_reports = to_reports(
+        result, MetricCategory.FILE, path_prefix=path, author=author_id
+    )
+    for r in file_reports:
+        r.category = MetricCategory.COMMIT_SET
+    return dir_reports + file_reports
